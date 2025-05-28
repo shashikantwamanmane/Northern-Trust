@@ -1,0 +1,383 @@
+#check the folder permission on the SQL server.
+#shashi 
+
+$FolderPath = dir -Directory -Path "\\ukdvssql15\GenericFeed" -Recurse -Force
+$Report = @()
+Foreach ($Folder in $FolderPath) {
+    $Acl = Get-Acl -Path $Folder.FullName
+    foreach ($Access in $acl.Access)
+        {
+            $Properties = [ordered]@{'FolderName'=$Folder.FullName;'AD
+Group or
+User'=$Access.IdentityReference;'Permissions'=$Access.FileSystemRights;'Inherited'=$Access.IsInherited}
+            $Report += New-Object -TypeName PSObject -Property $Properties
+        }
+}
+$Report | Export-Csv -path "C:\Users\sup_manes\Desktop\FolderPermissions.csv"
+
+------------------------------------------------------------------------------------------------------
+
+add user account into the administrators group via powersehll 
+
+
+Enter-PSSession uksprprmavm11
+
+PS C:\Users\Sup_ManeS\Documents> Add-LocalGroupMember -group "administrators" -member "lloyds.net\SUP_Egiazare"
+
+if you want to remove the permission
+
+PS C:\Users\Sup_ManeS\Documents> remove-LocalGroupMember -group "administrators" -member "lloyds.net\SUP_Egiazare"
+
+-------------------------------------------------------------------------------------------------------
+
+check machine is in domain or not 
+
+Get-WmiObject -Namespace root\cimv2 -Class Win32_ComputerSystem | Select Name, Domain
+
+-------------------------------------------------------------------------------------------------------------
+check the last reboot server or any domain machine, but ensure machine must be ping response. 
+
+Get-CimInstance Win32_OperatingSystem -ComputerName ukprqlik05 | 
+Select-Object PSComputerName,LastBootUpTime
+
+-----------------------------------------------------------------------------------------------------
+
+check the port details via powershell 
+
+Test-NetConnection -ComputerName google.com -Port 80
+-------------------------------------------------------------------------------------------------------------------
+Remove the members group from the lloyds.net domain. pls note, it is not for dev.lloyds.net domain. 
+
+# Replace 'username' with the actual username
+$user = "dev_cluskeyp"
+
+# Get the user and their group memberships
+$userGroups = Get-ADUser -Identity $user -Properties MemberOf | Select-Object -ExpandProperty MemberOf
+
+# Remove the user from each group
+foreach ($group in $userGroups) {
+    Remove-ADGroupMember -Identity $group -Members $user -Confirm:$false
+}
+
+------------------------------------------------------------------------------------------------------------------------------
+checking the group policy for remote user
+
+C:\Users\sup_manes>gpresult /s uksprtool478 /user dev_manes /r
+
+Microsoft (R) Windows (R) Operating System Group Policy Result tool v2.0
+© Microsoft Corporation. All rights reserved.
+
+---------------------------------------------------------------------------------------------------------------
+you can check when PW reset has been reseated 
+
+Get-ADUser -identity sSQLsrSILPPE14 -properties passwordlastset, passwordneverexpires | sort name | ft Name, passwordlastset, Passwordneverexpire
+
+------------------------------------------------------------------------------------------------------------
+
+add a service account more than 100 remote computers 
+
+# Define the username to be added (Domain or Local User)
+$user = "lloyds.net\service account name"
+
+# Load the list of servers from a file (each server on a new line)
+$servers = Get-Content -Path "C:\Path\To\ServerList.txt"
+
+# Alternatively, define the list of servers as a variable
+# $servers = @("Server1", "Server2", "Server3", ...)
+
+# Define the script block to run on each remote server
+$scriptBlock = {
+    param ($user)
+    
+    try {
+        # Add the user to the local Administrators group
+        $group = [ADSI]"WinNT://$env:COMPUTERNAME/Administrators,group"
+        $group.Add("WinNT://$user")
+        Write-Host "Successfully added $user to the Administrators group on $env:COMPUTERNAME"
+    }
+    catch {
+        Write-Host "Failed to add $user to the Administrators group on $env:COMPUTERNAME. Error: $_"
+    }
+}
+
+# Loop through each server and run the script block
+foreach ($server in $servers) {
+    Invoke-Command -ComputerName $server -ScriptBlock $scriptBlock -ArgumentList $user -Credential (Get-Credential)
+}
+-----------------------
+
+Remove a service account more than 100 remote computers 
+
+# Define the username to be removed (Domain or Local User)
+$user = "DOMAIN\Username"
+
+# Load the list of servers from a file (each server on a new line)
+$servers = Get-Content -Path "C:\Path\To\ServerList.txt"
+
+# Alternatively, define the list of servers as a variable
+# $servers = @("Server1", "Server2", "Server3", ...)
+
+# Define the script block to run on each remote server
+$scriptBlock = {
+    param ($user)
+
+    try {
+        # Get the local Administrators group
+        $group = [ADSI]"WinNT://$env:COMPUTERNAME/Administrators,group"
+        
+        # Remove the user from the Administrators group
+        $group.Remove("WinNT://$user")
+        
+        Write-Host "Successfully removed $user from the Administrators group on $env:COMPUTERNAME"
+    }
+    catch {
+        Write-Host "Failed to remove $user from the Administrators group on $env:COMPUTERNAME. Error: $_"
+    }
+}
+
+# Loop through each server and run the script block
+foreach ($server in $servers) {
+    Invoke-Command -ComputerName $server -ScriptBlock $scriptBlock -ArgumentList $user -Credential (Get-Credential)
+}
+
+-----------------------------------------------------------------------------------------------------------------------------
+
+# remove the vm from the domain 
+$securePass = ConvertTo-SecureString "utHFzjpAwKUZi7Q1dEtj" -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential ("lloyds.net\supda_manes", $securePass)
+Remove-Computer -Credential $cred -Force -Restart
+
+add the machine into the domain 
+cmd /c "netdom join uksprtool494 /domain:lloyds.net /userD:supda_manes /passwordD:utHFzjpAwKUZi7Q1dEtj /reboot:10"
+
+---------------------------------------------------------------------------------------------------
+
+check last reboot server 
+
+Get-CimInstance Win32_OperatingSystem -ComputerName uksprlaf03 | 
+Select-Object PSComputerName,LastBootUpTime
+
+-------------------------------------------------------------------------------------------
+
+removing the group from multiple computers
+
+# Path to the text file with the list of computers
+$computerList = "C:\Temp\Computers.txt"
+
+# Define the name of the group to delete
+$groupName = "ConfigMgr Remote Control Users"
+
+# Read the list of computers from the file
+$computers = Get-Content -Path $computerList
+
+foreach ($computer in $computers) {
+    try {
+        # Use Invoke-Command to run the command on remote computers
+        Invoke-Command -ComputerName $computer -ScriptBlock {
+            param($groupName)
+            if (Get-LocalGroup -Name $groupName -ErrorAction SilentlyContinue) {
+                Remove-LocalGroup -Name $groupName
+                Write-Host "Deleted group '$groupName' from $env:COMPUTERNAME" -ForegroundColor Green
+            } else {
+                Write-Host "Group '$groupName' not found on $env:COMPUTERNAME" -ForegroundColor Yellow
+            }
+        } -ArgumentList $groupName
+    } catch {
+        Write-Host "Failed to delete group '$groupName' on $computer" -ForegroundColor Red
+    }
+}
+
+Write-Host "Group deletion process complete."
+---------------------------------------------------------------------------------------------------------------------------
+
+check when the password will be expired on the AD
+
+# Import Active Directory module
+Import-Module ActiveDirectory
+
+# Replace "user name " with the user's SamAccountName
+$user = Get-ADUser -Identity "sup_manes" -Properties msDS-UserPasswordExpiryTimeComputed
+
+# Convert the password expiration time to a readable format
+if ($user.'msDS-UserPasswordExpiryTimeComputed') {
+    $expiryDate = [datetime]::FromFileTime($user.'msDS-UserPasswordExpiryTimeComputed')
+    Write-Host "Password for user '$($user.SamAccountName)' expires on: $expiryDate"
+} else {
+    Write-Host "Password expiry information not available for user '$($user.SamAccountName)'."
+}
+
+--------------------------------------------------------------------------------------------------------------------------
+
+Start the multiple VMs via powerhsell. 
+
+1. install Azure CLI (install-module -name az)
+2. open powershell in admin 
+3. connect-azaccount 
+4. enter credentials, and select precribation. 
+
+# Path to a text file with VM names (one per line)
+$vmListPath = "c:\TEMP\StartVM.txt"
+
+# Load VM names from the file
+$vmNames = Get-Content -Path $vmListPath
+
+# Specify the resource group (adjust as needed)
+$resourceGroupName = "UKS-PR-TOOL-03-RG"
+
+# Start each VM
+foreach ($vmName in $vmNames) {
+    try {
+        Start-AzVM -ResourceGroupName $resourceGroupName -Name $vmName -NoWait
+        Write-Host "Started Azure VM: $vmName" -ForegroundColor Green
+    } catch {
+        Write-Host "Failed to start Azure VM: $vmName. Error: $_" -ForegroundColor Red
+    }
+}
+
+Write-Host "VM startup process initiated for Azure VMs."
+
+--------------------------------------------------------------------------------------------------------------------------
+start multiple VM ver 2
+
+# Define the path to the VM list file
+$VMListPath = "C:\temp\startvm.txt"
+
+# Read VM names from the file
+$VMNames = Get-Content -Path $VMListPath
+
+# Loop through each VM and start it
+foreach ($VM in $VMNames) {
+    # Get the VM details to retrieve the Resource Group
+    $VMObject = Get-AzVM | Where-Object { $_.Name -eq $VM }
+
+    if ($VMObject) {
+        Start-AzVM -ResourceGroupName $VMObject.ResourceGroupName -Name $VMObject.Name -NoWait
+        Write-Host "Starting VM: $($VMObject.Name) in Resource Group: $($VMObject.ResourceGroupName)" -ForegroundColor Green
+    } else {
+        Write-Host "VM $VM not found in Azure." -ForegroundColor Red
+    }
+}
+
+Write-Host "All specified VMs have been started." -ForegroundColor Cyan
+
+
+---------------------------------------------------------------------------------------------------------------------------
+
+
+# Enable File and Printer Sharing (ICMPv4-In)
+Enable-NetFirewallRule -DisplayName "File and Printer Sharing (Echo Request - ICMPv4-In)", "File and Printer Sharing (SMB-In)"
+Write-Host "ICMPv4-In rule enabled successfully." 
+
+
+# Disable File and Printer Sharing (ICMPv4-In)
+Disable-NetFirewallRule -DisplayName "File and Printer Sharing (Echo Request - ICMPv4-In)", "File and Printer Sharing (SMB-In)"
+Write-Host "ICMPv4-In rule enabled successfully." 
+
+# Enable the below rules on local VM firewall to complete the DNA scan job.
+Get-NetFirewallRule -DisplayName "File and Printer Sharing (Echo Request - ICMPv4-In)", "File and Printer Sharing (SMB-In)", "Windows Management Instrumentation (DCOM-In)", "Remote Event Log Management (NP-In)", "Remote Event Log Management (RPC)", "Remote Event Log Management (RPC-EPMAP)", "Remote Scheduled Tasks Management (RPC)", "Windows Management Instrumentation (WMI-In)" |
+    Where profile -eq domain | Enable-NetFirewallRule
+Write-Host "Firewall roles need to enable for DNA scan successfully." 
+
+# Disable the below rules on local VM firewall post complete the DNA scan job.
+Get-NetFirewallRule -DisplayName "File and Printer Sharing (Echo Request - ICMPv4-In)", "File and Printer Sharing (SMB-In)", "Windows Management Instrumentation (DCOM-In)", "Remote Event Log Management (NP-In)", "Remote Event Log Management (RPC)", "Remote Event Log Management (RPC-EPMAP)", "Remote Scheduled Tasks Management (RPC)", "Windows Management Instrumentation (WMI-In)" |
+    Where profile -eq domain | Disable-NetFirewallRule
+Write-Host "Firewall roles need to disable for DNA scan successfully."
+
+-----------------------------------------------------------------------------------------------------------
+get AD User and get AD group details 
+
+# Export all AD users with key attributes
+Get-ADUser -Filter * -Properties DisplayName, SamAccountName, UserPrincipalName, Mail, Enabled, LastLogonDate | 
+Select-Object DisplayName, SamAccountName, UserPrincipalName, Mail, Enabled, LastLogonDate | 
+Export-Csv -Path "C:\Users\SupDa_Manes\Desktop\Shashi\AD user.csv" -NoTypeInformation
+Write-Host "AD Users exported successfully to C:\Users\SupDa_Manes\Desktop\Shashi\AD user.csv" -ForegroundColor Green
+
+
+
+
+# Export all AD groups
+Get-ADGroup -Filter * -Properties Name, GroupCategory, GroupScope, Description | 
+Select-Object Name, GroupCategory, GroupScope, Description | 
+Export-Csv -Path "C:\Users\SupDa_Manes\Desktop\Shashi\AD Group.csv" -NoTypeInformation
+Write-Host "AD Groups exported successfully to C:\Users\SupDa_Manes\Desktop\Shashi\AD Group.csv" -ForegroundColor Green
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+export single user memberof from AD 
+
+$username = "EdwardsB"
+Get-ADUser -Identity $UserName -Properties MemberOf |
+Select-Object -ExpandProperty MemberOf |
+Get-ADGroup | Select-Object Name |
+Export-Csv -Path "C:\temp\shashi\Edwardsb.csv" -NoTypeInformation
+
+Write-Host "Exported $UserName's group memberships to C:\temp\shashi\Edwardsb.csv" -ForegroundColor Green
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+please use the below script for add permissions on the Graph API
+
+# Connect to Azure AD
+Connect-AzureAD
+
+# Step 1: Get the Enterprise App (Service Principal) by ObjectId or DisplayName
+$AppName = "Disable-User-LogicApp"
+$SP = Get-AzureADServicePrincipal -Filter "displayName eq '$AppName'"
+
+# Step 2: Get the Microsoft Graph Service Principal
+$GraphAppId = "00000003-0000-0000-c000-000000000000"
+$GraphSP = Get-AzureADServicePrincipal -Filter "appId eq '$GraphAppId'"
+
+# Step 3: Define the permissions you want to assign
+$Permissions = @("User.ManageIdentities.All", "User.Read.All", "User.EnableDisableAccount.All", "User.RevokeSessions.All")
+
+# Step 4: Assign the roles
+foreach ($perm in $Permissions) {
+    $Role = $GraphSP.AppRoles | Where-Object { $_.Value -eq $perm -and $_.AllowedMemberTypes -contains "Application" }
+    
+    if ($Role) {
+        New-AzureADServiceAppRoleAssignment -ObjectId $SP.ObjectId `
+            -PrincipalId $SP.ObjectId `
+            -ResourceId $GraphSP.ObjectId `
+            -Id $Role.Id
+
+        Write-Host "Assigned permission $($perm) to $($AppName)" -ForegroundColor Green
+    } else {
+        Write-Host "Permission $($perm) not found" -ForegroundColor Red
+    }
+}
+
+
+use the below script for 2nd app. 
+
+# Connect to Azure AD
+Connect-AzureAD
+$AppName = "Enable-User-LogicApp"
+$SP = Get-AzureADServicePrincipal -Filter "displayName eq '$AppName'"
+$GraphAppId = "00000003-0000-0000-c000-000000000000"
+$GraphSP = Get-AzureADServicePrincipal -Filter "appId eq '$GraphAppId'"
+$Permissions = @("User.ManageIdentities.All", "User.Read.All", "User.EnableDisableAccount.All")
+foreach ($perm in $Permissions) {
+    $Role = $GraphSP.AppRoles | Where-Object { $_.Value -eq $perm -and $_.AllowedMemberTypes -contains "Application" }
+    
+    if ($Role) {
+        New-AzureADServiceAppRoleAssignment -ObjectId $SP.ObjectId `
+            -PrincipalId $SP.ObjectId `
+            -ResourceId $GraphSP.ObjectId `
+            -Id $Role.Id
+
+        Write-Host "Assigned permission $($perm) to $($AppName)" -ForegroundColor Green
+    } else {
+        Write-Host "Permission $($perm) not found" -ForegroundColor Red
+    }
+}
+
+
+------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
